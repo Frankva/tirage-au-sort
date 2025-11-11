@@ -7,7 +7,7 @@
   <title>Tirage au sort</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/reallygoodsoftware/tailwind-lite@759f1d7/dist/tailwind.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <script type="importmap">
     {
       "imports": {
@@ -29,12 +29,55 @@
 
     const html = htm.bind(h);
 
+    // Composant ThemeSelector
+    const ThemeSelector = () => {
+      const [theme, setTheme] = useState(() => {
+        // Vérifier le thème sauvegardé ou la préférence système
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) return savedTheme;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      });
+
+      // Appliquer le thème au body
+      useEffect(() => {
+        if (theme === 'auto') {
+          // Suivre la préférence système
+          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+          const applySystemTheme = () => {
+            document.documentElement.setAttribute('data-theme', mediaQuery.matches ? 'dark' : 'light');
+          };
+
+          applySystemTheme();
+          mediaQuery.addEventListener('change', applySystemTheme);
+
+          return () => mediaQuery.removeEventListener('change', applySystemTheme);
+        } else {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      }, [theme]);
+
+      const handleThemeChange = (newTheme) => {
+        setTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+      };
+
+      return html`
+        <div class="theme-selector">
+          <select value=${theme} onChange=${(e) => handleThemeChange(e.target.value)}>
+            <option value="auto">🌓</option>
+            <option value="light">☀️</option>
+            <option value="dark">🌙</option>
+          </select>
+        </div>
+      `;
+    };
+
     // Composant Header
     const Header = () => {
       return html`
-        <header class="text-center mb-8">
-          <h1 class="text-3xl font-bold">Tirage au sort</h1>
-          <p class="text-gray-600 mt-2">Entrez vos éléments et laissez le hasard décider</p>
+        <header>
+          <h1>Tirage au sort</h1>
+          <p>Entrez vos éléments et laissez le hasard décider</p>
         </header>
       `;
     };
@@ -92,40 +135,36 @@
       };
 
       return html`
-        <section class="mb-8">
-          <div class="mb-4">
-            <label for="items-list" class="block mb-2 font-medium">Entrez un élément par ligne :</label>
-            <textarea 
+        <section>
+          <div>
+            <label for="items-list">Entrez un élément par ligne :</label>
+            <textarea
               id="items-list"
               ref=${textareaRef}
               rows="10"
-              class="w-full p-3 border rounded mb-4"
               placeholder="Exemple :&#10;Pierre&#10;Paul&#10;Jacques"
               onInput=${handleInputChange}
               onKeyDown=${handleKeyDown}
             ></textarea>
           </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button 
+
+          <div>
+            <button
               onClick=${onDraw}
               disabled=${isDrawing}
-              class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
             >
               ${isDrawing ? 'Tirage en cours...' : 'Tirer au sort'}
             </button>
-            
-            <button 
+
+            <button
               onClick=${onClearResult}
               disabled=${!hasResult}
-              class="bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300 disabled:opacity-50"
             >
               Effacer le résultat
             </button>
-            
-            <button 
+
+            <button
               onClick=${onReset}
-              class="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700"
             >
               Tout effacer
             </button>
@@ -137,18 +176,18 @@
     // Composant ResultSection
     const ResultSection = ({ itemsCount, result }) => {
       return html`
-        <section class="mb-8">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-gray-100 p-4 rounded">
-              <p class="font-medium">Nombre d'éléments :</p>
-              <p class="text-xl font-bold">${itemsCount}</p>
-            </div>
-            
+        <section>
+          <div>
+            <article>
+              <header>Nombre d'éléments :</header>
+              <p>${itemsCount}</p>
+            </article>
+
             ${result && html`
-              <div class="bg-white border border-gray-200 rounded-lg p-6 text-center">
-                <h2 class="text-lg font-semibold mb-3">Résultat du tirage :</h2>
-                <div class="text-3xl font-bold text-blue-600 p-4 bg-blue-50 rounded-lg">${result}</div>
-              </div>
+              <article>
+                <h3>Résultat du tirage :</h3>
+                <p><strong>${result}</strong></p>
+              </article>
             `}
           </div>
         </section>
@@ -166,25 +205,23 @@
       };
 
       return html`
-        <div class="mt-6 p-4 bg-gray-100 rounded">
-          <p class="font-medium mb-2">URL de partage :</p>
-          <div class="flex">
-            <input 
-              type="text" 
-              value=${window.location.href} 
-              readonly 
-              class="flex-grow p-2 border rounded-l"
+        <div>
+          <p>URL de partage :</p>
+          <div>
+            <input
+              type="text"
+              value=${window.location.href}
+              readonly
             />
-            <button 
+            <button
               onClick=${copyUrl}
-              class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700"
             >
               ${copied ? 'Copié !' : 'Copier'}
             </button>
           </div>
-          <p class="text-sm text-gray-600 mt-2">
+          <small>
             Partagez cette URL pour sauvegarder ou partager votre liste
-          </p>
+          </small>
         </div>
       `;
     };
@@ -192,7 +229,7 @@
     // Composant Footer
     const Footer = () => {
       return html`
-        <footer class="mt-12 text-center text-gray-500">
+        <footer>
           <p>Application de tirage au sort - Fonctionne entièrement dans votre navigateur</p>
         </footer>
       `;
@@ -279,10 +316,11 @@
       };
 
       return html`
-        <main class="container mx-auto p-4">
+        <main class="container">
+          <${ThemeSelector} />
           <${Header} />
-          
-          <${InputSection} 
+
+          <${InputSection}
             items=${items}
             onItemsChange=${handleItemsChange}
             onDraw=${drawLottery}
@@ -291,14 +329,14 @@
             isDrawing=${isDrawing}
             hasResult=${!!result}
           />
-          
-          <${ResultSection} 
+
+          <${ResultSection}
             itemsCount=${items.length}
             result=${result}
           />
-          
+
           <${UrlShare} />
-          
+
           <${Footer} />
         </main>
       `;
