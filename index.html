@@ -7,7 +7,7 @@
   <title>Tirage au sort</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/reallygoodsoftware/tailwind-lite@759f1d7/dist/tailwind.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
   <script type="importmap">
     {
       "imports": {
@@ -20,8 +20,6 @@
 </head>
 
 <body>
-  <div id="app"></div>
-
   <script type="module">
     import { h, render } from 'preact';
     import { useState, useRef, useEffect } from 'preact/hooks';
@@ -62,13 +60,16 @@
       };
 
       return html`
-        <div class="theme-selector">
-          <select value=${theme} onChange=${(e) => handleThemeChange(e.target.value)}>
+        <nav>
+          <select
+            value=${theme}
+            onChange=${(e) => handleThemeChange(e.target.value)}
+          >
             <option value="auto">🌓</option>
             <option value="light">☀️</option>
             <option value="dark">🌙</option>
           </select>
-        </div>
+        </nav>
       `;
     };
 
@@ -76,14 +77,25 @@
     const Header = () => {
       return html`
         <header>
-          <h1>Tirage au sort</h1>
-          <p>Entrez vos éléments et laissez le hasard décider</p>
+          <nav>
+            <ul>
+              <li>
+                <hgroup>
+                  <h1>Tirage au sort</h1>
+                  <p>Entrez vos éléments et laissez le hasard décider</p>
+                </hgroup>
+              </li>
+            </ul>
+            <ul>
+              <${ThemeSelector} />
+            </ul>
+          </nav>
         </header>
       `;
     };
 
     // Composant InputSection
-    const InputSection = ({ items, onItemsChange, onDraw, onClearResult, onReset, isDrawing, hasResult }) => {
+    const InputSection = ({ items, onItemsChange, onDraw, onReset, isDrawing }) => {
       const textareaRef = useRef(null);
       const [textValue, setTextValue] = useState('');
 
@@ -136,93 +148,89 @@
 
       return html`
         <section>
-          <div>
-            <label for="items-list">Entrez un élément par ligne :</label>
-            <textarea
-              id="items-list"
-              ref=${textareaRef}
-              rows="10"
-              placeholder="Exemple :&#10;Pierre&#10;Paul&#10;Jacques"
-              onInput=${handleInputChange}
-              onKeyDown=${handleKeyDown}
-            ></textarea>
-          </div>
+          <form>
+              <label for="items-list">Entrez un élément par ligne :</label>
+              <textarea
+                id="items-list"
+                ref=${textareaRef}
+                rows="10"
+                placeholder="Pierre\nPaul\nJacques"
+                onInput=${handleInputChange}
+                onKeyDown=${handleKeyDown}
+              ></textarea>
 
-          <div>
             <button
+              type="submit"
               onClick=${onDraw}
               disabled=${isDrawing}
             >
               ${isDrawing ? 'Tirage en cours...' : 'Tirer au sort'}
             </button>
 
-            <button
-              onClick=${onClearResult}
-              disabled=${!hasResult}
-            >
-              Effacer le résultat
-            </button>
-
-            <button
+            <input
+              type="reset"
+              value="Tout effacer"
               onClick=${onReset}
-            >
-              Tout effacer
-            </button>
-          </div>
+            />
+          </form>
         </section>
       `;
     };
 
     // Composant ResultSection
-    const ResultSection = ({ itemsCount, result }) => {
+    const ResultSection = ({ itemsCount, result, onClearResult, hasResult }) => {
       return html`
         <section>
-          <div>
-            <article>
-              <header>Nombre d'éléments :</header>
-              <p>${itemsCount}</p>
-            </article>
+          <article>
+            <header>Nombre d'éléments :</header>
+            <p>${itemsCount}</p>
+          </article>
 
-            ${result && html`
-              <article>
-                <h3>Résultat du tirage :</h3>
-                <p><strong>${result}</strong></p>
-              </article>
-            `}
-          </div>
+          ${result && html`
+            <article>
+              <h3>Résultat du tirage :</h3>
+              <p><strong>${result}</strong></p>
+            </article>
+          `}
+
+          ${hasResult && html`
+            <button
+              onClick=${onClearResult}
+            >
+              Effacer le résultat
+            </button>
+          `}
         </section>
       `;
     };
 
     // Composant UrlShare
-    const UrlShare = () => {
+    const UrlShare = ({ shareUrl }) => {
       const [copied, setCopied] = useState(false);
-      
+
       const copyUrl = () => {
-        navigator.clipboard.writeText(window.location.href);
+        navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       };
 
       return html`
-        <div>
+        <article>
           <p>URL de partage :</p>
-          <div>
-            <input
-              type="text"
-              value=${window.location.href}
-              readonly
-            />
-            <button
-              onClick=${copyUrl}
-            >
-              ${copied ? 'Copié !' : 'Copier'}
-            </button>
-          </div>
+          <input
+            type="text"
+            value=${shareUrl}
+            readonly
+          />
           <small>
             Partagez cette URL pour sauvegarder ou partager votre liste
           </small>
-        </div>
+          <button
+            onClick=${copyUrl}
+          >
+            ${copied ? 'Copié !' : 'Copier'}
+          </button>
+        </article>
       `;
     };
 
@@ -241,6 +249,7 @@
       const [result, setResult] = useState(null);
       const [isDrawing, setIsDrawing] = useState(false);
       const [initialized, setInitialized] = useState(false);
+      const [shareUrl, setShareUrl] = useState(window.location.href);
 
       // Charger les éléments depuis l'URL au démarrage
       useEffect(() => {
@@ -262,16 +271,18 @@
       // Mettre à jour l'URL lorsque les éléments changent
       useEffect(() => {
         if (!initialized) return;
-        
+
         if (items.length > 0) {
           const encodedItems = encodeURIComponent(items.join('\n'));
           const url = new URL(window.location);
           url.searchParams.set('items', encodedItems);
           window.history.replaceState({}, '', url);
+          setShareUrl(url.toString());
         } else {
           const url = new URL(window.location);
           url.searchParams.delete('items');
           window.history.replaceState({}, '', url);
+          setShareUrl(url.toString());
         }
       }, [items, initialized]);
 
@@ -316,33 +327,32 @@
       };
 
       return html`
-        <main class="container">
-          <${ThemeSelector} />
+        <main>
           <${Header} />
 
           <${InputSection}
             items=${items}
             onItemsChange=${handleItemsChange}
             onDraw=${drawLottery}
-            onClearResult=${clearResult}
             onReset=${resetAll}
             isDrawing=${isDrawing}
-            hasResult=${!!result}
           />
 
           <${ResultSection}
             itemsCount=${items.length}
             result=${result}
+            onClearResult=${clearResult}
+            hasResult=${!!result}
           />
 
-          <${UrlShare} />
+          <${UrlShare} shareUrl=${shareUrl} />
 
           <${Footer} />
         </main>
       `;
     };
 
-    render(html`<${App} />`, document.getElementById('app'));
+    render(html`<${App} />`, document.body);
   </script>
 </body>
 </html>
