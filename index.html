@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tirage au sort</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/reallygoodsoftware/tailwind-lite@759f1d7/dist/tailwind.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "preact": "https://esm.sh/preact",
+        "preact/": "https://esm.sh/preact/",
+        "htm": "https://esm.sh/htm"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { h, render } from 'preact';
+    import { useState, useRef, useEffect } from 'preact/hooks';
+    import htm from 'htm';
+
+    const html = htm.bind(h);
+
+    // Composant Header
+    const Header = () => {
+      return html`
+        <header class="text-center mb-8">
+          <h1 class="text-3xl font-bold">Tirage au sort</h1>
+          <p class="text-gray-600 mt-2">Entrez vos éléments et laissez le hasard décider</p>
+        </header>
+      `;
+    };
+
+    // Composant InputSection
+    const InputSection = ({ items, onItemsChange, onDraw, onClearResult, onReset, isDrawing, hasResult }) => {
+      const textareaRef = useRef(null);
+      const [textValue, setTextValue] = useState('');
+
+      // Initialiser le textarea avec les items
+      useEffect(() => {
+        if (textareaRef.current && items.length > 0) {
+          const text = items.join('\n');
+          setTextValue(text);
+          textareaRef.current.value = text;
+        }
+      }, [items]);
+
+      // Gérer les changements dans le textarea
+      const handleInputChange = () => {
+        const text = textareaRef.current.value;
+        setTextValue(text);
+        
+        // Ne mettre à jour les items que lorsque l'utilisateur a fini de taper (debounce)
+        clearTimeout(window.inputTimeout);
+        window.inputTimeout = setTimeout(() => {
+          const newItems = text.split('\n').filter(item => item.trim() !== '');
+          onItemsChange(newItems);
+        }, 500);
+      };
+
+      // Gérer la touche Entrée pour ajouter une nouvelle ligne
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const start = e.target.selectionStart;
+          const end = e.target.selectionEnd;
+          const newValue = textValue.substring(0, start) + '\n' + textValue.substring(end);
+          
+          setTextValue(newValue);
+          textareaRef.current.value = newValue;
+          
+          // Positionner le curseur après le saut de ligne
+          setTimeout(() => {
+            textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 1;
+          }, 0);
+          
+          // Mettre à jour les items après un court délai
+          clearTimeout(window.inputTimeout);
+          window.inputTimeout = setTimeout(() => {
+            const newItems = newValue.split('\n').filter(item => item.trim() !== '');
+            onItemsChange(newItems);
+          }, 500);
+        }
+      };
+
+      return html`
+        <section class="mb-8">
+          <div class="mb-4">
+            <label for="items-list" class="block mb-2 font-medium">Entrez un élément par ligne :</label>
+            <textarea 
+              id="items-list"
+              ref=${textareaRef}
+              rows="10"
+              class="w-full p-3 border rounded mb-4"
+              placeholder="Exemple :&#10;Pierre&#10;Paul&#10;Jacques"
+              onInput=${handleInputChange}
+              onKeyDown=${handleKeyDown}
+            ></textarea>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button 
+              onClick=${onDraw}
+              disabled=${isDrawing}
+              class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              ${isDrawing ? 'Tirage en cours...' : 'Tirer au sort'}
+            </button>
+            
+            <button 
+              onClick=${onClearResult}
+              disabled=${!hasResult}
+              class="bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300 disabled:opacity-50"
+            >
+              Effacer le résultat
+            </button>
+            
+            <button 
+              onClick=${onReset}
+              class="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700"
+            >
+              Tout effacer
+            </button>
+          </div>
+        </section>
+      `;
+    };
+
+    // Composant ResultSection
+    const ResultSection = ({ itemsCount, result }) => {
+      return html`
+        <section class="mb-8">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gray-100 p-4 rounded">
+              <p class="font-medium">Nombre d'éléments :</p>
+              <p class="text-xl font-bold">${itemsCount}</p>
+            </div>
+            
+            ${result && html`
+              <div class="bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <h2 class="text-lg font-semibold mb-3">Résultat du tirage :</h2>
+                <div class="text-3xl font-bold text-blue-600 p-4 bg-blue-50 rounded-lg">${result}</div>
+              </div>
+            `}
+          </div>
+        </section>
+      `;
+    };
+
+    // Composant UrlShare
+    const UrlShare = () => {
+      const [copied, setCopied] = useState(false);
+      
+      const copyUrl = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      };
+
+      return html`
+        <div class="mt-6 p-4 bg-gray-100 rounded">
+          <p class="font-medium mb-2">URL de partage :</p>
+          <div class="flex">
+            <input 
+              type="text" 
+              value=${window.location.href} 
+              readonly 
+              class="flex-grow p-2 border rounded-l"
+            />
+            <button 
+              onClick=${copyUrl}
+              class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700"
+            >
+              ${copied ? 'Copié !' : 'Copier'}
+            </button>
+          </div>
+          <p class="text-sm text-gray-600 mt-2">
+            Partagez cette URL pour sauvegarder ou partager votre liste
+          </p>
+        </div>
+      `;
+    };
+
+    // Composant Footer
+    const Footer = () => {
+      return html`
+        <footer class="mt-12 text-center text-gray-500">
+          <p>Application de tirage au sort - Fonctionne entièrement dans votre navigateur</p>
+        </footer>
+      `;
+    };
+
+    // Composant principal App
+    const App = () => {
+      const [items, setItems] = useState([]);
+      const [result, setResult] = useState(null);
+      const [isDrawing, setIsDrawing] = useState(false);
+      const [initialized, setInitialized] = useState(false);
+
+      // Charger les éléments depuis l'URL au démarrage
+      useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const itemsParam = urlParams.get('items');
+        
+        if (itemsParam) {
+          try {
+            const decodedItems = decodeURIComponent(itemsParam);
+            const newItems = decodedItems.split('\n').filter(item => item.trim() !== '');
+            setItems(newItems);
+          } catch (e) {
+            console.error("Erreur lors du décodage des éléments depuis l'URL", e);
+          }
+        }
+        setInitialized(true);
+      }, []);
+
+      // Mettre à jour l'URL lorsque les éléments changent
+      useEffect(() => {
+        if (!initialized) return;
+        
+        if (items.length > 0) {
+          const encodedItems = encodeURIComponent(items.join('\n'));
+          const url = new URL(window.location);
+          url.searchParams.set('items', encodedItems);
+          window.history.replaceState({}, '', url);
+        } else {
+          const url = new URL(window.location);
+          url.searchParams.delete('items');
+          window.history.replaceState({}, '', url);
+        }
+      }, [items, initialized]);
+
+      // Mettre à jour la liste des éléments
+      const handleItemsChange = (newItems) => {
+        setItems(newItems);
+      };
+
+      // Tirer au sort
+      const drawLottery = () => {
+        if (items.length === 0) {
+          alert('Veuillez entrer au moins un élément');
+          return;
+        }
+
+        setIsDrawing(true);
+        setResult(null);
+
+        // Animation de tirage
+        let counter = 0;
+        const interval = setInterval(() => {
+          const randomIndex = Math.floor(Math.random() * items.length);
+          setResult(items[randomIndex]);
+          counter++;
+
+          if (counter > 20) {
+            clearInterval(interval);
+            setIsDrawing(false);
+          }
+        }, 100);
+      };
+
+      // Réinitialiser
+      const resetAll = () => {
+        setItems([]);
+        setResult(null);
+      };
+
+      // Effacer le résultat
+      const clearResult = () => {
+        setResult(null);
+      };
+
+      return html`
+        <main class="container mx-auto p-4">
+          <${Header} />
+          
+          <${InputSection} 
+            items=${items}
+            onItemsChange=${handleItemsChange}
+            onDraw=${drawLottery}
+            onClearResult=${clearResult}
+            onReset=${resetAll}
+            isDrawing=${isDrawing}
+            hasResult=${!!result}
+          />
+          
+          <${ResultSection} 
+            itemsCount=${items.length}
+            result=${result}
+          />
+          
+          <${UrlShare} />
+          
+          <${Footer} />
+        </main>
+      `;
+    };
+
+    render(html`<${App} />`, document.getElementById('app'));
+  </script>
+</body>
+</html>
